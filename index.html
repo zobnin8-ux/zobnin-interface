@@ -556,7 +556,7 @@
           <div>
             <div class="eyebrow">Результат</div>
             <h2>Готовые сценарии</h2>
-            <p class="subcopy">Круглая кнопка под листом отправляет только этот продукт в WF2. Можно отправить всё сразу или перейти в последовательное редактирование.</p>
+            <p class="subcopy">Круглая кнопка под листом отправляет только этот продукт прямо в WF2. Кнопка «Отправить всё» уходит в диспетчер, а режим редактирования работает по одному продукту.</p>
           </div>
           <div class="brand">Проверка</div>
         </div>
@@ -659,7 +659,8 @@
        */
       const API = {
         wf1: 'https://boeingg.app.n8n.cloud/webhook/c822c0b4-b42f-42a1-93a1-1dd7453d4db2',
-        wf2: 'https://boeingg.app.n8n.cloud/webhook/generate-media'
+        wf2: 'https://boeingg.app.n8n.cloud/webhook/generate-media',
+        dispatcher: 'https://boeingg.app.n8n.cloud/webhook/select_all'
       };
 
       let products = [null, null, null];
@@ -906,24 +907,23 @@
           setGlobalBusy(true);
           btn.textContent = 'Отправляю...';
 
-          const pendingSlots = products
-            .map((item, index) => item ? index + 1 : 0)
-            .filter(Boolean);
+          const payloadProducts = activeProducts().map((product) => ({
+            product_name: product.name,
+            product_text: product.text
+          }));
 
-          for (const slot of pendingSlots) {
-            const product = products[slot - 1];
-            if (!product) continue;
+          setStatus('review-status', `Передаю ${payloadProducts.length} продукт(а/ов) в диспетчер...`);
 
-            setStatus('review-status', `Отправляю "${product.name}" в WF2...`);
-            await sendProductToWF2(product);
-            products[slot - 1] = null;
-            renderReview();
-          }
+          await postJson(API.dispatcher, {
+            products: payloadProducts
+          });
 
+          products = [null, null, null];
+          renderReview();
           checkDone();
         } catch (error) {
           console.error(error);
-          setStatus('review-status', error.message || 'Ошибка пакетной отправки в WF2.', true);
+          setStatus('review-status', error.message || 'Ошибка отправки в диспетчер.', true);
         } finally {
           btn.textContent = oldText;
           setGlobalBusy(false);
